@@ -374,6 +374,7 @@
     }
 
     // ⑤ 新郎新婦への動画自動アップロード（送信）
+    // ⑤ 新郎新婦への動画自動アップロード（送信・CORS対策版）
     async function uploadVideo() {
       if (!recordedBlob || recordedBlob.size === 0) {
         alert('動画データが正常に作成されていません。撮り直してください。');
@@ -387,35 +388,33 @@
       const ext = (mediaRecorder.mimeType || '').includes('mp4') ? 'mp4' : 'webm';
       const fileName = `wedding_msg_${Date.now()}.${ext}`;
 
-      if (UPLOAD_ENDPOINT) {
-        try {
-          const base64Data = await blobToBase64(recordedBlob);
+      try {
+        const base64Data = await blobToBase64(recordedBlob);
 
-          const payload = {
-            base64: base64Data,
-            mimeType: recordedBlob.type || 'video/mp4',
-            fileName: fileName
-          };
+        const payload = {
+          base64: base64Data,
+          mimeType: recordedBlob.type || 'video/mp4',
+          fileName: fileName
+        };
 
-          const response = await fetch(UPLOAD_ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify(payload)
-          });
+        // mode: 'no-cors' を指定してブラウザの通信ブロックを回避
+        await fetch(UPLOAD_ENDPOINT, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(payload)
+        });
 
-          const result = await response.json();
+        // 送信完了画面を表示
+        showThanksScreen();
 
-          if (result.status === 'success') {
-            showThanksScreen();
-          } else {
-            throw new Error(result.message);
-          }
-        } catch (err) {
-          alert('【エラー詳細】\n' + err.message);
-          sendBtn.disabled = false;
-          retakeBtn.disabled = false;
-          sendBtn.innerText = '新郎新婦へ送信';
-        }
+      } catch (err) {
+        alert('送信時にエラーが発生しました。\n' + err.message);
+        sendBtn.disabled = false;
+        retakeBtn.disabled = false;
+        sendBtn.innerText = '新郎新婦へ送信';
+      }
+    }
       } else {
         setTimeout(() => {
           showThanksScreen();
