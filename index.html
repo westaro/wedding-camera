@@ -17,7 +17,6 @@
 
     h2 { font-size: 1.2rem; margin-bottom: 12px; color: #444; }
     
-    /* 撮影・プレビュー共有コンテナ（9:16比率） */
     .media-container {
       position: relative;
       width: 100%;
@@ -39,7 +38,6 @@
 
     #backgroundVideo { display: none; }
 
-    /* RECマーク & 30秒カウントダウン表示 */
     .rec-status {
       position: absolute;
       top: 12px;
@@ -71,7 +69,6 @@
       50% { opacity: 0.2; }
     }
 
-    /* 操作ボタンエリア */
     .controls {
       margin-top: 16px;
       display: flex;
@@ -100,7 +97,6 @@
     .btn-retake { background: #6c757d; color: white; }
     .btn-send { background: #28a745; color: white; }
 
-    /* 送信完了・ローディング画面 */
     .status-overlay {
       display: none;
       flex-direction: column;
@@ -119,7 +115,6 @@
 
   <h2>メッセージ動画を撮る</h2>
 
-  <!-- 1. 撮影 / プレビュー画面 -->
   <div id="mediaSection" class="media-container">
     <canvas id="previewCanvas"></canvas>
     
@@ -132,20 +127,24 @@
     <video id="backgroundVideo" autoplay playsinline muted></video>
   </div>
 
-  <!-- 2. 送信完了画面 -->
   <div id="thanksSection" class="media-container status-overlay">
     <h3>送信が完了しました！</h3>
     <p>温かいメッセージを<br>ありがとうございます✨</p>
     <button class="btn-start" onclick="resetToCamera()" style="margin-top: 15px;">他のメッセージを撮る</button>
   </div>
 
-  <!-- 操作ボタン群 -->
   <div class="controls">
     <button id="startBtn" class="btn-start" onclick="startCamera()">① カメラ起動</button>
     <button id="recBtn" class="btn-rec" onclick="toggleRecording()" disabled style="display: inline-block;">② 録画開始</button>
     <button id="retakeBtn" class="btn-retake" onclick="retakeVideo()" style="display: none;">撮り直す</button>
     <button id="sendBtn" class="btn-send" onclick="uploadVideo()" style="display: none;">新郎新婦へ送信</button>
   </div>
+
+  <!-- 確実にGASへPOST送信するための非表示フォーム -->
+  <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
+  <form id="uploadForm" method="POST" target="hidden_iframe" style="display:none;">
+    <input type="hidden" name="dummy" value="">
+  </form>
 
   <script>
     const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycby7staI1mQ9FWeF9H0uW2l9AT8lK-Kgqs3pmmvUP8VMuHFT4_G-lpocISVJhiltfkuQ/exec';
@@ -347,7 +346,7 @@
       });
     }
 
-    // ⑤ 新郎新婦への動画自動アップロード（送信・CORS回避）
+    // ⑤ 確実なフォームPOST送信処理
     async function uploadVideo() {
       if (!recordedBlob || recordedBlob.size === 0) {
         alert('動画データが正常に作成されていません。撮り直してください。');
@@ -370,14 +369,26 @@
           fileName: fileName
         };
 
-        await fetch(UPLOAD_ENDPOINT, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(payload)
-        });
+        const form = document.getElementById('uploadForm');
+        form.action = UPLOAD_ENDPOINT;
 
-        showThanksScreen();
+        // payloadをフォーム要素として動的にセットして送信
+        let input = form.querySelector('input[name="postData"]');
+        if (!input) {
+          input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = 'postData';
+          form.appendChild(input);
+        }
+        input.value = JSON.stringify(payload);
+
+        // 送信完了検知（iframeの読み込み完了）
+        const iframe = document.getElementById('hidden_iframe');
+        iframe.onload = () => {
+          showThanksScreen();
+        };
+
+        form.submit();
 
       } catch (err) {
         alert('送信エラー: ' + err.message);
