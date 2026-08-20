@@ -140,11 +140,8 @@
     <button id="sendBtn" class="btn-send" onclick="uploadVideo()" style="display: none;">新郎新婦へ送信</button>
   </div>
 
-  <!-- 確実にGASへPOST送信するための非表示フォーム -->
   <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
-  <form id="uploadForm" method="POST" target="hidden_iframe" style="display:none;">
-    <input type="hidden" name="dummy" value="">
-  </form>
+  <form id="uploadForm" method="POST" target="hidden_iframe" style="display:none;"></form>
 
   <script>
     const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycby7staI1mQ9FWeF9H0uW2l9AT8lK-Kgqs3pmmvUP8VMuHFT4_G-lpocISVJhiltfkuQ/exec';
@@ -346,7 +343,6 @@
       });
     }
 
-    // ⑤ 確実なフォームPOST送信処理
     async function uploadVideo() {
       if (!recordedBlob || recordedBlob.size === 0) {
         alert('動画データが正常に作成されていません。撮り直してください。');
@@ -371,18 +367,14 @@
 
         const form = document.getElementById('uploadForm');
         form.action = UPLOAD_ENDPOINT;
+        form.innerHTML = ''; // クリア
 
-        // payloadをフォーム要素として動的にセットして送信
-        let input = form.querySelector('input[name="postData"]');
-        if (!input) {
-          input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = 'postData';
-          form.appendChild(input);
-        }
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'postData';
         input.value = JSON.stringify(payload);
+        form.appendChild(input);
 
-        // 送信完了検知（iframeの読み込み完了）
         const iframe = document.getElementById('hidden_iframe');
         iframe.onload = () => {
           showThanksScreen();
