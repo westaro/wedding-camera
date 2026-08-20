@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>結婚式メッセージカメラ (完全合成版)</title>
+  <title>結婚式メッセージカメラ</title>
   <style>
     body { font-family: sans-serif; text-align: center; margin: 0; padding: 20px; background: #f4f4f7; }
     
@@ -58,43 +58,25 @@
     let frameImage;
     let userStream;
 
-    // Canva画像(frame.png)の読み込み
     function loadFrame() {
       return new Promise((resolve, reject) => {
         frameImage = new Image();
-        frameImage.src = 'frame.png?v=' + new Date().getTime(); // キャッシュ防止
+        frameImage.src = 'frame.png?v=' + new Date().getTime();
         frameImage.onload = () => resolve();
-        frameImage.onerror = () => reject('frame.png の読み込みに失敗しました。ファイル名と配置場所を確認してください。');
+        frameImage.onerror = () => reject('frame.png の読み込みに失敗しました。');
       });
     }
 
-    // 毎フレーム「カメラ映像 + frame.png」を重ねてCanvasに描画
     function drawComposite() {
       if (video.paused || video.ended) return;
 
       canvas.width = 1080;
       canvas.height = 1920;
 
-      // 1. カメラ映像をアスペクト比を維持して中央描画
-      const targetRatio = 9 / 16;
-      const videoRatio = video.videoWidth / video.videoHeight;
-      let sw, sh, sx, sy;
+      // 1. カメラ映像をカットせずに全体描画（ズーム・アップの解消）
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      if (videoRatio > targetRatio) {
-        sh = video.videoHeight;
-        sw = sh * targetRatio;
-        sx = (video.videoWidth - sw) / 2;
-        sy = 0;
-      } else {
-        sw = video.videoWidth;
-        sh = sw / targetRatio;
-        sx = 0;
-        sy = (video.videoHeight - sh) / 2;
-      }
-
-      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
-
-      // 2. Canvaのframe.pngを上から重ねて描画（埋め込み）
+      // 2. Canvaのframe.pngを上から重ねて描画
       if (frameImage) {
         ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
       }
@@ -106,8 +88,9 @@
       try {
         await loadFrame();
 
+        // 映像の切り抜きが発生しないようアスペクト比を指定してカメラを取得
         userStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 1080 }, height: { ideal: 1920 } },
+          video: { facingMode: "user", aspectRatio: { ideal: 9 / 16 } },
           audio: true
         });
         
@@ -118,16 +101,13 @@
           drawComposite();
         };
 
-        // Canvasの映像ストリームを取得 (30fps)
         const canvasStream = canvas.captureStream(30);
 
-        // マイク音声を合成ストリームに追加（音声も動画に入れるため）
         const audioTrack = userStream.getAudioTracks()[0];
         if (audioTrack) {
           canvasStream.addTrack(audioTrack);
         }
 
-        // ブラウザに応じた最適な録画形式(MIME Type)を自動選択
         let options = {};
         if (MediaRecorder.isTypeSupported('video/mp4')) {
           options = { mimeType: 'video/mp4' };
@@ -142,9 +122,8 @@
         mediaRecorder.onstop = saveVideo;
 
         recBtn.disabled = false;
-        alert('カメラとフレームの準備ができました！');
+        // 起動通知メッセージ（alert）を削除しました
       } catch (err) {
-        alert(err);
         console.error(err);
       }
     }
@@ -176,7 +155,7 @@
       a.click();
       
       URL.revokeObjectURL(url);
-      alert('動画がダウンロードされました！動画内にCanvaのデザインが埋め込まれているか確認してください。');
+      // ダウンロード完了メッセージ（alert）を削除しました
     }
   </script>
 </body>
