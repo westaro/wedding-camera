@@ -7,7 +7,7 @@
   <style>
     body { font-family: sans-serif; text-align: center; margin: 0; padding: 20px; background: #f4f4f7; }
     
-    /* 縦型スマホ画面の枠組 */
+    /* 縦型スマホ画面の枠組（9:16比率） */
     .camera-container {
       position: relative;
       width: 100%;
@@ -22,21 +22,14 @@
 
     video { width: 100%; height: 100%; object-fit: cover; }
 
-    /* カメラの上に重ねるオリジナルフレームのデザイン */
+    /* カメラの上にぴったり重ねる透過画像フレーム */
     .frame-overlay {
       position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none;
-      box-sizing: border-box;
-      border: 10px solid rgba(212, 175, 55, 0.8); /* ゴールドの枠 */
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      padding: 20px;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: contain; /* 画像の比率を維持して重ねる */
+      pointer-events: none; /* ボタン操作を邪魔しないようにする */
     }
-
-    .frame-title { color: #fff; font-size: 20px; font-weight: bold; text-shadow: 1px 1px 4px #000; }
-    .frame-footer { color: #fff; font-size: 14px; text-shadow: 1px 1px 4px #000; }
 
     .controls { margin-top: 20px; }
     button {
@@ -55,11 +48,8 @@
   <div class="camera-container">
     <video id="video" autoplay playsinline muted></video>
     
-    <!-- オリジナルフレーム部分（CSSで重ね合わせ） -->
-    <div class="frame-overlay">
-      <div class="frame-title">Happy Wedding!</div>
-      <div class="frame-footer">Taro & Hanako<br>2026.08.20</div>
-    </div>
+    <!-- 透過PNG画像のフレーム -->
+    <img src="frame.png" class="frame-overlay" alt="フレーム">
   </div>
 
   <div class="controls">
@@ -80,7 +70,6 @@
         });
         document.getElementById('video').srcObject = stream;
         
-        // 録画機能のセットアップ
         mediaRecorder = new MediaRecorder(stream);
         mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.onstop = saveVideo;
@@ -107,7 +96,6 @@
       }
     }
 
-    // 撮影した動画をダウンロード保存する
     function saveVideo() {
       const blob = new Blob(recordedChunks, { type: 'video/mp4' });
       const url = URL.createObjectURL(blob);
