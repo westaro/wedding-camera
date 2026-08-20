@@ -3,37 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>結婚式メッセージカメラ</title>
+  <title>結婚式メッセージカメラ (合成保存版)</title>
   <style>
-    * { box-sizing: border-box; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-      text-align: center;
-      margin: 0;
-      padding: 16px;
-      background: #f4f4f7;
-      color: #333;
-    }
-
-    h2 {
-      font-size: 1.2rem;
-      margin-bottom: 12px;
-    }
+    body { font-family: sans-serif; text-align: center; margin: 0; padding: 20px; background: #f4f4f7; }
     
-    /* 合成プレビュー用のCanvas（9:16比率） */
+    /* プレビュー表示用コンテナ（9:16比率） */
     .camera-container {
       position: relative;
       width: 100%;
-      max-width: 340px;
+      max-width: 320px;
       aspect-ratio: 9 / 16;
       margin: 0 auto;
       border-radius: 16px;
       overflow: hidden;
       background: #000;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
     }
 
-    /* プレビュー用のCanvas要素 */
+    /* カメラとフレームが合成描画されるCanvas */
     #previewCanvas {
       width: 100%;
       height: 100%;
@@ -41,94 +28,35 @@
       display: block;
     }
 
-    /* 裏でカメラ映像を受けるVideo要素（非表示） */
+    /* バックグラウンド処理用の非表示ビデオ */
     #backgroundVideo {
       display: none;
     }
 
-    /* 録画中のインジケーター & タイマー表示 */
-    .rec-status {
-      position: absolute;
-      top: 12px;
-      left: 12px;
-      display: none;
-      align-items: center;
-      gap: 6px;
-      background: rgba(0, 0, 0, 0.6);
-      padding: 4px 10px;
-      border-radius: 20px;
-      color: #fff;
-      font-size: 13px;
-      font-weight: bold;
-      z-index: 10;
-    }
-
-    .rec-status.active {
-      display: flex;
-    }
-
-    .rec-dot {
-      width: 10px;
-      height: 10px;
-      background-color: #ff3b30;
-      border-radius: 50%;
-      animation: blink 1s infinite;
-    }
-
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
-
-    .controls {
-      margin-top: 16px;
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-    }
-
+    .controls { margin-top: 20px; }
     button {
-      padding: 12px 20px;
-      font-size: 15px;
-      border: none;
-      border-radius: 25px;
-      cursor: pointer;
-      font-weight: bold;
-      transition: background 0.2s, opacity 0.2s;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      padding: 12px 24px; font-size: 15px; margin: 5px;
+      border: none; border-radius: 25px; cursor: pointer; font-weight: bold;
     }
-
-    button:disabled {
-      background: #ccc !important;
-      cursor: not-allowed;
-      box-shadow: none;
-      opacity: 0.7;
-    }
-
     .btn-start { background: #007bff; color: white; }
     .btn-rec { background: #dc3545; color: white; }
-    .btn-stop { background: #28a745; color: white; }
+    .btn-rec:disabled { background: #ccc; }
   </style>
 </head>
 <body>
 
-  <h2>メッセージ動画撮影</h2>
+  <h2>メッセージ動画を撮る</h2>
 
   <div class="camera-container">
+    <!-- カメラ映像＋フレーム画像が合成される描画キャンバス -->
     <canvas id="previewCanvas"></canvas>
     
-    <!-- 録画中インジケーター（画面左上） -->
-    <div id="recStatus" class="rec-status">
-      <div class="rec-dot"></div>
-      <span id="timerText">00:00</span>
-    </div>
-
-    <!-- カメラ映像を受ける（非表示） -->
+    <!-- カメラの生映像を受けるビデオ要素（画面には表示されません） -->
     <video id="backgroundVideo" autoplay playsinline muted></video>
   </div>
 
   <div class="controls">
-    <button id="startBtn" class="btn-start" onclick="startApp()">① カメラ起動</button>
+    <button id="startBtn" class="btn-start" onclick="startApp()">① アプリ起動</button>
     <button id="recBtn" class="btn-rec" onclick="toggleRecording()" disabled>② 録画開始</button>
   </div>
 
@@ -138,70 +66,64 @@
     const video = document.getElementById('backgroundVideo');
     const startBtn = document.getElementById('startBtn');
     const recBtn = document.getElementById('recBtn');
-    const recStatus = document.getElementById('recStatus');
-    const timerText = document.getElementById('timerText');
     
     let mediaRecorder;
     let recordedChunks = [];
     let isRecording = false;
     let frameImage;
     let userStream;
-    let timerInterval;
-    let recordStartTime;
 
-    // フレーム画像の読み込み (キャッシュ対策つき)
+    // ① フレーム画像の読み込み (キャッシュ防止対策)
     function loadFrame() {
       return new Promise((resolve, reject) => {
         frameImage = new Image();
         frameImage.src = 'frame.png?v=' + new Date().getTime();
         frameImage.onload = () => resolve();
-        frameImage.onerror = (e) => reject('frame.png の読み込みに失敗しました');
+        frameImage.onerror = (e) => reject('frame.png の読み込みに失敗しました。');
       });
     }
 
-    // 合成描画処理（カメラ＋フレーム）
+    // ② カメラ映像とフレーム画像をキャンバスにリアルタイム合成描画
     function drawComposite() {
       if (video.paused || video.ended) return;
 
-      // 1. カメラ映像を描画
-      // 映像のアスペクト比を保ちつつ描画範囲を計算
-      const targetRatio = 9 / 16;
-      const videoRatio = video.videoWidth / video.videoHeight;
+      // 1. カメラ映像を描画（アスペクト比調整）
+      const targetAspectRatio = 9 / 16;
+      const videoAspectRatio = video.videoWidth / video.videoHeight;
       
-      let sw, sh, sx, sy;
-      if (videoRatio > targetRatio) {
-        // 横長の場合、左右を収まる範囲でトリミング
-        sh = video.videoHeight;
-        sw = sh * targetRatio;
-        sx = (video.videoWidth - sw) / 2;
-        sy = 0;
+      let drawWidth, drawHeight, offsetX, offsetY;
+      if (videoAspectRatio > targetAspectRatio) {
+        drawHeight = video.videoHeight;
+        drawWidth = drawHeight * targetAspectRatio;
+        offsetX = (video.videoWidth - drawWidth) / 2;
+        offsetY = 0;
       } else {
-        // 縦長の場合、上下を収まる範囲でトリミング
-        sw = video.videoWidth;
-        sh = sw / targetRatio;
-        sx = 0;
-        sy = (video.videoHeight - sh) / 2;
+        drawWidth = video.videoWidth;
+        drawHeight = drawWidth / targetAspectRatio;
+        offsetX = 0;
+        offsetY = (video.videoHeight - drawHeight) / 2;
       }
 
-      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height);
+      // カメラ映像をCanvas全体に描画
+      ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight, 0, 0, canvas.width, canvas.height);
 
-      // 2. フレーム画像を上から重ねて描画
+      // 2. フレーム画像をカメラ映像の上に重ねて描画
       if (frameImage) {
         ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.height);
       }
 
-      // 次のフレームも描画ループ
+      // 毎フレーム合成処理を継続
       requestAnimationFrame(drawComposite);
     }
 
-    // ① カメラ・アプリ起動処理
+    // ③ アプリ起動処理
     async function startApp() {
       try {
         await loadFrame();
 
-        // カメラ・マイクの権限取得（縦長画角を優先リクエスト）
+        // カメラ・マイクのストリーム取得
         userStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", aspectRatio: { ideal: 9 / 16 } },
+          video: { facingMode: "user", width: { ideal: 1080 }, height: { ideal: 1920 } },
           audio: true
         });
         
@@ -209,22 +131,22 @@
         
         video.onloadedmetadata = () => {
           video.play();
-          // Canvas解像度をスマホ標準（縦長1080x1920）に設定
+          // Canvasの解像度をスマホ動画の解像度（1080x1920）に設定
           canvas.width = 1080;
           canvas.height = 1920;
           drawComposite();
         };
 
-        // Canvasの映像ストリームを取得 (30fps)
+        // 【重要】合成後のCanvasから映像ストリームを取得 (30fps)
         const canvasStream = canvas.captureStream(30);
 
-        // 【重要】マイクの音声トラックをCanvasストリームに追加（無音録画防止）
+        // 【重要】マイクの音声トラックを合成ストリームに追加（無音化防止）
         const audioTrack = userStream.getAudioTracks()[0];
         if (audioTrack) {
           canvasStream.addTrack(audioTrack);
         }
 
-        // ブラウザ（iOS/Android/PC）に対応した形式を自動判定
+        // スマホ（iOS / Android）で動作する形式を自動判別
         let options = {};
         if (MediaRecorder.isTypeSupported('video/mp4;codecs=avc1')) {
           options = { mimeType: 'video/mp4;codecs=avc1' };
@@ -236,60 +158,37 @@
           options = { mimeType: 'video/webm' };
         }
 
+        // 合成ストリームを録画対象にセット
         mediaRecorder = new MediaRecorder(canvasStream, options);
         mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.onstop = saveVideo;
 
-        // UI状態切り替え
+        recBtn.disabled = false;
         startBtn.disabled = true;
         startBtn.innerText = 'カメラ起動中';
-        recBtn.disabled = false;
       } catch (err) {
-        console.error('起動エラー:', err);
-        alert('カメラの起動に失敗しました。カメラ・マイクの使用許可をご確認ください。');
+        alert('起動に失敗しました。カメラ・マイクの許可、または frame.png の存在を確認してください。');
+        console.error(err);
       }
     }
 
-    // ② 録画の開始 / 停止切り替え
+    // ④ 録画の開始・停止切り替え
     function toggleRecording() {
       if (!isRecording) {
-        // 録画開始
         recordedChunks = [];
         mediaRecorder.start();
         isRecording = true;
-        
         recBtn.innerText = '■ 録画停止';
-        recBtn.className = 'btn-stop';
-        recStatus.classList.add('active');
-
-        // タイマー開始
-        recordStartTime = Date.now();
-        updateTimer();
-        timerInterval = setInterval(updateTimer, 1000);
+        recBtn.style.background = '#333';
       } else {
-        // 録画停止
         mediaRecorder.stop();
         isRecording = false;
-        
         recBtn.innerText = '② 録画開始';
-        recBtn.className = 'btn-rec';
-        recStatus.classList.remove('active');
-
-        // タイマー停止
-        clearInterval(timerInterval);
-        timerText.innerText = '00:00';
+        recBtn.style.background = '#dc3545';
       }
     }
 
-    // タイマー更新関数
-    function updateTimer() {
-      const elapsed = Math.floor((Date.now() - recordStartTime) / 1000);
-      const mins = String(Math.floor(elapsed / 60)).padStart(2, '0');
-      const secs = String(elapsed % 60).padStart(2, '0');
-      timerText.innerText = `${mins}:${secs}`;
-    }
-
-    // ③ 動画ファイルのダウンロード保存
+    // ⑤ 合成済み動画のダウンロード保存
     function saveVideo() {
       const mimeType = mediaRecorder.mimeType || 'video/webm';
       const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
