@@ -162,7 +162,7 @@
     // ⚙️ 設定エリア（新郎新婦のサーバー保存先URL）
     // ==========================================
     // Google Apps Script、Firebase Storage、自前サーバー等の受け取りURLを設定します
-    const UPLOAD_ENDPOINT = ''; // 例: 'https://script.google.com/macros/s/xxx/exec'
+    const UPLOAD_ENDPOINT = ''; // 例: 'https://script.google.com/macros/s/AKfycbwX91Jq8X4_-WwiyOARCKZ2DBANhYgKfuYp8qTQbz0TATNxaQJ4Ma1RoqbI6Ma-u-xy/exec'
 
     const MAX_RECORD_SECONDS = 30; // 上限撮影時間（秒）
 
@@ -358,43 +358,62 @@
       recBtn.disabled = false;
     }
 
-    // ⑤ 新郎新婦への動画自動アップロード（送信）
-    async function uploadVideo() {
-      if (!recordedBlob) return;
+    // BlobをBase64文字列に変換するヘルパー関数
+  function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
 
-      sendBtn.disabled = true;
-      retakeBtn.disabled = true;
-      sendBtn.innerText = '送信中...';
+  // ⑤ 新郎新婦への動画自動アップロード（送信）
+  async function uploadVideo() {
+    if (!recordedBlob) return;
 
-      const ext = (mediaRecorder.mimeType || '').includes('mp4') ? 'mp4' : 'webm';
-      const fileName = `wedding_msg_${Date.now()}.${ext}`;
+    sendBtn.disabled = true;
+    retakeBtn.disabled = true;
+    sendBtn.innerText = '送信中...';
 
-      // サーバー設定がある場合は実際にPOST送信
-      if (UPLOAD_ENDPOINT) {
-        try {
-          const formData = new FormData();
-          formData.append('video', recordedBlob, fileName);
+    const ext = (mediaRecorder.mimeType || '').includes('mp4') ? 'mp4' : 'webm';
+    const fileName = `wedding_msg_${Date.now()}.${ext}`;
 
-          const response = await fetch(UPLOAD_ENDPOINT, {
-            method: 'POST',
-            body: formData
-          });
+    if (UPLOAD_ENDPOINT) {
+      try {
+        const base64Data = await blobToBase64(recordedBlob);
 
-          if (!response.ok) throw new Error('送信失敗');
+        const payload = {
+          base64: base64Data,
+          mimeType: recordedBlob.type || 'video/mp4',
+          fileName: fileName
+        };
+
+        const response = await fetch(UPLOAD_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(payload)
+        });
+
+        const result = await response.json();
+
+        if (result.status === 'success') {
           showThanksScreen();
-        } catch (err) {
-          alert('送信に失敗しました。通信環境をご確認のうえ再度お試しください。');
-          sendBtn.disabled = false;
-          retakeBtn.disabled = false;
-          sendBtn.innerText = '新郎新婦へ送信';
+        } else {
+          throw new Error(result.message);
         }
-      } else {
-        // デモ用（ENDPOINT未設定の場合は擬似送信処理）
-        setTimeout(() => {
-          showThanksScreen();
-        }, 1200);
+      } catch (err) {
+        alert('送信に失敗しました。通信環境をご確認のうえ再度お試しください。');
+        sendBtn.disabled = false;
+        retakeBtn.disabled = false;
+        sendBtn.innerText = '新郎新婦へ送信';
       }
+    } else {
+      setTimeout(() => {
+        showThanksScreen();
+      }, 1200);
     }
+  }
 
     function showThanksScreen() {
       mediaSection.style.display = 'none';
