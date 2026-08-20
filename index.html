@@ -193,7 +193,7 @@
     frameImage.src = 'frame.png';
     frameImage.onload = () => { frameLoaded = true; };
 
-    // リアルタイム描画ループ
+    // リアルタイム描画ループ（アスペクト比を維持して切り出し）
     function drawComposite() {
       if (video.readyState >= 2 && !video.paused && !video.ended) {
         const targetRatio = 9 / 16;
@@ -221,11 +221,11 @@
       requestAnimationFrame(drawComposite);
     }
 
-    // ① カメラの起動
+    // ① カメラの起動（カメラ本来の自然な画角で取得）
     async function startCamera() {
       try {
         userStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: { ideal: 1080 }, height: { ideal: 1920 } },
+          video: { facingMode: "user" },
           audio: true
         });
         
@@ -233,7 +233,7 @@
         
         video.onloadedmetadata = () => {
           video.play();
-          // ご要望通り 1080 × 1920 の高解像度を維持
+          // 高解像度（1080 × 1920）でキャンバスをセット
           canvas.width = 1080;
           canvas.height = 1920;
           drawComposite();
@@ -282,9 +282,9 @@
 
       const mimeType = getSupportedMimeType();
       
-      // 1080x1920の高解像度を保持しつつ、データ容量オーバーを防ぐビットレート最適化
+      // 1080x1920の高解像度を保持しつつ容量オーバーを防ぐビットレート最適化
       const recorderOptions = {
-        videoBitsPerSecond: 2500000 // 2.5Mbpsに最適化
+        videoBitsPerSecond: 2500000 // 2.5Mbps
       };
       if (mimeType) recorderOptions.mimeType = mimeType;
 
@@ -360,7 +360,7 @@
       recBtn.disabled = false;
     }
 
-    // BlobをBase64文字列に変換（余計なヘッダーを自動除去）
+    // BlobをBase64文字列に変換
     function blobToBase64(blob) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
