@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>結婚式カメラテスト</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 20px; }
+    video { width: 100%; max-width: 400px; border-radius: 12px; border: 2px solid #ccc; }
+    button { padding: 12px 24px; font-size: 16px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>カメラ起動テスト</h1>
+  <button onclick="startCamera()">カメラを起動する</button>
+  <br><br>
+  <video id="video" autoplay playsinline></video>
+
+  <script>
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        document.getElementById('video').srcObject = stream;
+      } catch (err) {
+        alert('カメラの許可が得られませんでした: ' + err);
+      }
+    }
+  </script>
+</body>
+</html>
