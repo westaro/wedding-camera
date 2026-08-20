@@ -14,7 +14,6 @@
       background: #f8f9fa;
       color: #333;
     }
-
     h2 { font-size: 1.2rem; margin-bottom: 12px; color: #444; }
     
     .media-container {
@@ -28,14 +27,12 @@
       background: #000;
       box-shadow: 0 8px 24px rgba(0,0,0,0.18);
     }
-
     #previewCanvas, #recordedVideo {
       width: 100%;
       height: 100%;
       object-fit: cover;
       display: block;
     }
-
     #backgroundVideo { display: none; }
 
     .rec-status {
@@ -53,9 +50,7 @@
       font-weight: bold;
       z-index: 10;
     }
-
     .rec-status.active { display: flex; }
-
     .rec-dot {
       width: 10px;
       height: 10px;
@@ -63,11 +58,7 @@
       border-radius: 50%;
       animation: blink 1s infinite;
     }
-
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.2; }
-    }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
 
     .controls {
       margin-top: 16px;
@@ -76,7 +67,6 @@
       gap: 10px;
       flex-wrap: wrap;
     }
-
     button {
       padding: 12px 20px;
       font-size: 15px;
@@ -87,7 +77,6 @@
       transition: transform 0.1s, opacity 0.2s;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
-
     button:active { transform: scale(0.98); }
     button:disabled { background: #ccc !important; cursor: not-allowed; box-shadow: none; }
 
@@ -107,7 +96,6 @@
       background: #ffffff;
       color: #333;
     }
-
     .status-overlay h3 { margin-bottom: 8px; color: #28a745; }
   </style>
 </head>
@@ -139,9 +127,6 @@
     <button id="retakeBtn" class="btn-retake" onclick="retakeVideo()" style="display: none;">撮り直す</button>
     <button id="sendBtn" class="btn-send" onclick="uploadVideo()" style="display: none;">新郎新婦へ送信</button>
   </div>
-
-  <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
-  <form id="uploadForm" method="POST" target="hidden_iframe" style="display:none;"></form>
 
   <script>
     const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycby7staI1mQ9FWeF9H0uW2l9AT8lK-Kgqs3pmmvUP8VMuHFT4_G-lpocISVJhiltfkuQ/exec';
@@ -294,7 +279,6 @@
       clearInterval(recordTimer);
       mediaRecorder.stop();
       isRecording = false;
-
       recStatus.classList.remove('active');
     }
 
@@ -318,13 +302,10 @@
         URL.revokeObjectURL(recordedVideo.src);
         recordedVideo.src = '';
       }
-
       recordedVideo.style.display = 'none';
       canvas.style.display = 'block';
-
       retakeBtn.style.display = 'none';
       sendBtn.style.display = 'none';
-      
       recBtn.style.display = 'inline-block';
       recBtn.innerText = '② 録画開始';
       recBtn.className = 'btn-rec';
@@ -336,13 +317,14 @@
         const reader = new FileReader();
         reader.onloadend = () => {
           const res = reader.result || '';
-          resolve(res.includes(',') ? res.split(',')[1] : res);
+          resolve(res);
         };
         reader.onerror = reject;
         reader.readAsDataURL(blob);
       });
     }
 
+    // JSON変換をやめ、生データとURLパラメータで送信する最軽量処理
     async function uploadVideo() {
       if (!recordedBlob || recordedBlob.size === 0) {
         alert('動画データが正常に作成されていません。撮り直してください。');
@@ -353,34 +335,26 @@
       retakeBtn.disabled = true;
       sendBtn.innerText = '送信中...';
 
-      const ext = (mediaRecorder.mimeType || '').includes('mp4') ? 'mp4' : 'webm';
+      const mimeType = recordedBlob.type || 'video/mp4';
+      const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
       const fileName = `wedding_msg_${Date.now()}.${ext}`;
 
       try {
         const base64Data = await blobToBase64(recordedBlob);
 
-        const payload = {
-          base64: base64Data,
-          mimeType: recordedBlob.type || 'video/mp4',
-          fileName: fileName
-        };
+        // ファイル名はURLにくっつけて送信
+        const requestUrl = `${UPLOAD_ENDPOINT}?mimeType=${encodeURIComponent(mimeType)}&fileName=${encodeURIComponent(fileName)}`;
 
-        const form = document.getElementById('uploadForm');
-        form.action = UPLOAD_ENDPOINT;
-        form.innerHTML = ''; // クリア
+        // JSONにせず、テキスト生データをそのまま直接GASへ叩き込む
+        await fetch(requestUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'text/plain' },
+          body: base64Data
+        });
 
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'postData';
-        input.value = JSON.stringify(payload);
-        form.appendChild(input);
-
-        const iframe = document.getElementById('hidden_iframe');
-        iframe.onload = () => {
-          showThanksScreen();
-        };
-
-        form.submit();
+        // 完了画面
+        showThanksScreen();
 
       } catch (err) {
         alert('送信エラー: ' + err.message);
@@ -393,7 +367,6 @@
     function showThanksScreen() {
       mediaSection.style.display = 'none';
       thanksSection.style.display = 'flex';
-      
       retakeBtn.style.display = 'none';
       sendBtn.style.display = 'none';
     }
@@ -401,11 +374,9 @@
     function resetToCamera() {
       thanksSection.style.display = 'none';
       mediaSection.style.display = 'block';
-
       sendBtn.disabled = false;
       retakeBtn.disabled = false;
       sendBtn.innerText = '新郎新婦へ送信';
-
       retakeVideo();
     }
   </script>
