@@ -159,9 +159,8 @@
 
   <script>
     // ==========================================
-    // ⚙️ 設定エリア（新郎新婦のサーバー保存先URL）
+    // ⚙️ 設定エリア
     // ==========================================
-    // Google Apps Script、Firebase Storage、自前サーバー等の受け取りURLを設定します
     const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycby7staI1mQ9FWeF9H0uW2l9AT8lK-Kgqs3pmmvUP8VMuHFT4_G-lpocISVJhiltfkuQ/exec';
 
     const MAX_RECORD_SECONDS = 30; // 上限撮影時間（秒）
@@ -194,7 +193,7 @@
     frameImage.src = 'frame.png';
     frameImage.onload = () => { frameLoaded = true; };
 
-    // リアルタイム描画ループ（常に背景で動かし続けフリーズを防ぐ）
+    // リアルタイム描画ループ
     function drawComposite() {
       if (video.readyState >= 2 && !video.paused && !video.ended) {
         const targetRatio = 9 / 16;
@@ -226,7 +225,7 @@
     async function startCamera() {
       try {
         userStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user" },
+          video: { facingMode: "user", width: { ideal: 1080 }, height: { ideal: 1920 } },
           audio: true
         });
         
@@ -234,8 +233,9 @@
         
         video.onloadedmetadata = () => {
           video.play();
-          canvas.width = 540;
-          canvas.height = 960;
+          // ご要望通り 1080 × 1920 の高解像度を維持
+          canvas.width = 1080;
+          canvas.height = 1920;
           drawComposite();
         };
 
@@ -272,7 +272,6 @@
     function startRecording() {
       recordedChunks = [];
 
-      // 毎回新しいMediaStreamおよびMediaRecorderを生成（2回目以降の動作不具合を完全解決）
       const canvasStream = canvas.captureStream(30);
       const audioTrack = userStream.getAudioTracks()[0];
       
@@ -282,7 +281,14 @@
       ]);
 
       const mimeType = getSupportedMimeType();
-      mediaRecorder = new MediaRecorder(combinedStream, mimeType ? { mimeType } : {});
+      
+      // 1080x1920の高解像度を保持しつつ、データ容量オーバーを防ぐビットレート最適化
+      const recorderOptions = {
+        videoBitsPerSecond: 2500000 // 2.5Mbpsに最適化
+      };
+      if (mimeType) recorderOptions.mimeType = mimeType;
+
+      mediaRecorder = new MediaRecorder(combinedStream, recorderOptions);
       
       mediaRecorder.ondataavailable = e => {
         if (e.data && e.data.size > 0) recordedChunks.push(e.data);
@@ -293,12 +299,10 @@
       mediaRecorder.start();
       isRecording = true;
 
-      // UI表示の切り替え
       recBtn.innerText = '■ 録画停止';
       recBtn.className = 'btn-stop';
       recStatus.classList.add('active');
 
-      // 30秒カウントダウンタイマー開始
       countdownLeft = MAX_RECORD_SECONDS;
       timerText.innerText = `残り ${countdownLeft}秒`;
       
@@ -307,7 +311,7 @@
         timerText.innerText = `残り ${countdownLeft}秒`;
         
         if (countdownLeft <= 0) {
-          stopRecording(); // 30秒に達したら自動停止
+          stopRecording();
         }
       }, 1000);
     }
@@ -321,7 +325,7 @@
       recStatus.classList.remove('active');
     }
 
-    // ③ 録画完了後の処理（プレビュー画面の生成）
+    // ③ 録画完了後の処理
     function processRecordedVideo() {
       const mimeType = mediaRecorder.mimeType || 'video/mp4';
       recordedBlob = new Blob(recordedChunks, { type: mimeType });
@@ -329,11 +333,9 @@
       const videoURL = URL.createObjectURL(recordedBlob);
       recordedVideo.src = videoURL;
 
-      // カメラ表示から録画ビデオ表示へ切替
       canvas.style.display = 'none';
       recordedVideo.style.display = 'block';
 
-      // ボタン表示切り替え
       recBtn.style.display = 'none';
       retakeBtn.style.display = 'inline-block';
       sendBtn.style.display = 'inline-block';
@@ -358,73 +360,68 @@
       recBtn.disabled = false;
     }
 
-    // BlobをBase64文字列に変換するヘルパー関数
-  function blobToBase64(blob) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result.split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(blob);
-    });
-  }
-
-  // ⑤ 新郎新婦への動画自動アップロード（送信）
-  async function uploadVideo() {
-    // データが空の場合は処理をブロック
-    if (!recordedBlob || recordedBlob.size === 0) {
-      alert('動画データが正常に生成されていません。もう一度「撮り直す」を行ってください。');
-      return;
-    }
-
-    sendBtn.disabled = true;
-    retakeBtn.disabled = true;
-    sendBtn.innerText = '送信中...';
-    // （以降の処理はそのまま）
-    if (!recordedBlob) return;
-
-    sendBtn.disabled = true;
-    retakeBtn.disabled = true;
-    sendBtn.innerText = '送信中...';
-
-    const ext = (mediaRecorder.mimeType || '').includes('mp4') ? 'mp4' : 'webm';
-    const fileName = `wedding_msg_${Date.now()}.${ext}`;
-
-    if (UPLOAD_ENDPOINT) {
-      try {
-        const base64Data = await blobToBase64(recordedBlob);
-
-        const payload = {
-          base64: base64Data,
-          mimeType: recordedBlob.type || 'video/mp4',
-          fileName: fileName
+    // BlobをBase64文字列に変換（余計なヘッダーを自動除去）
+    function blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const res = reader.result || '';
+          resolve(res.includes(',') ? res.split(',')[1] : res);
         };
-
-        const response = await fetch(UPLOAD_ENDPOINT, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(payload)
-        });
-
-        const result = await response.json();
-
-        if (result.status === 'success') {
-          showThanksScreen();
-        } else {
-          throw new Error(result.message);
-        }
-      } catch (err) {
-        // エラーの「具体的な理由」を画面にポップアップ表示する
-        alert('【エラー詳細】\n' + err.message);
-        sendBtn.disabled = false;
-        retakeBtn.disabled = false;
-        sendBtn.innerText = '新郎新婦へ送信';
-      }
-    } else {
-      setTimeout(() => {
-        showThanksScreen();
-      }, 1200);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
     }
-  }
+
+    // ⑤ 新郎新婦への動画自動アップロード（送信）
+    async function uploadVideo() {
+      if (!recordedBlob || recordedBlob.size === 0) {
+        alert('動画データが正常に作成されていません。撮り直してください。');
+        return;
+      }
+
+      sendBtn.disabled = true;
+      retakeBtn.disabled = true;
+      sendBtn.innerText = '送信中...';
+
+      const ext = (mediaRecorder.mimeType || '').includes('mp4') ? 'mp4' : 'webm';
+      const fileName = `wedding_msg_${Date.now()}.${ext}`;
+
+      if (UPLOAD_ENDPOINT) {
+        try {
+          const base64Data = await blobToBase64(recordedBlob);
+
+          const payload = {
+            base64: base64Data,
+            mimeType: recordedBlob.type || 'video/mp4',
+            fileName: fileName
+          };
+
+          const response = await fetch(UPLOAD_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(payload)
+          });
+
+          const result = await response.json();
+
+          if (result.status === 'success') {
+            showThanksScreen();
+          } else {
+            throw new Error(result.message);
+          }
+        } catch (err) {
+          alert('【エラー詳細】\n' + err.message);
+          sendBtn.disabled = false;
+          retakeBtn.disabled = false;
+          sendBtn.innerText = '新郎新婦へ送信';
+        }
+      } else {
+        setTimeout(() => {
+          showThanksScreen();
+        }, 1200);
+      }
+    }
 
     function showThanksScreen() {
       mediaSection.style.display = 'none';
