@@ -370,6 +370,16 @@
 
   // ⑤ 新郎新婦への動画自動アップロード（送信）
   async function uploadVideo() {
+    // データが空の場合は処理をブロック
+    if (!recordedBlob || recordedBlob.size === 0) {
+      alert('動画データが正常に生成されていません。もう一度「撮り直す」を行ってください。');
+      return;
+    }
+
+    sendBtn.disabled = true;
+    retakeBtn.disabled = true;
+    sendBtn.innerText = '送信中...';
+    // （以降の処理はそのまま）
     if (!recordedBlob) return;
 
     sendBtn.disabled = true;
