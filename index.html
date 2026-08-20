@@ -17,7 +17,6 @@
 
     h2 { font-size: 1.2rem; margin-bottom: 12px; color: #444; }
     
-    /* 撮影・プレビュー共有コンテナ（9:16比率） */
     .media-container {
       position: relative;
       width: 100%;
@@ -39,7 +38,6 @@
 
     #backgroundVideo { display: none; }
 
-    /* RECマーク & 30秒カウントダウン表示 */
     .rec-status {
       position: absolute;
       top: 12px;
@@ -71,7 +69,6 @@
       50% { opacity: 0.2; }
     }
 
-    /* 操作ボタンエリア */
     .controls {
       margin-top: 16px;
       display: flex;
@@ -100,7 +97,6 @@
     .btn-retake { background: #6c757d; color: white; }
     .btn-send { background: #28a745; color: white; }
 
-    /* 送信完了・ローディング画面 */
     .status-overlay {
       display: none;
       flex-direction: column;
@@ -119,51 +115,34 @@
 
   <h2>メッセージ動画を撮る</h2>
 
-  <!-- 1. 撮影 / プレビュー画面 -->
   <div id="mediaSection" class="media-container">
-    <!-- ライブカメラ撮影キャンバス -->
     <canvas id="previewCanvas"></canvas>
     
-    <!-- 録画中のREC・カウントダウン表示 -->
     <div id="recStatus" class="rec-status">
       <div class="rec-dot"></div>
       <span id="timerText">残り 30秒</span>
     </div>
 
-    <!-- 録画後のプレビュー確認用ビデオ（初期非表示） -->
     <video id="recordedVideo" controls playsinline style="display: none;"></video>
-    
-    <!-- 裏処理用（非表示） -->
     <video id="backgroundVideo" autoplay playsinline muted></video>
   </div>
 
-  <!-- 2. 送信完了画面（初期非表示） -->
   <div id="thanksSection" class="media-container status-overlay">
     <h3>送信が完了しました！</h3>
     <p>温かいメッセージを<br>ありがとうございます✨</p>
     <button class="btn-start" onclick="resetToCamera()" style="margin-top: 15px;">他のメッセージを撮る</button>
   </div>
 
-  <!-- 操作ボタン群 -->
   <div class="controls">
-    <!-- カメラ未起動時 -->
     <button id="startBtn" class="btn-start" onclick="startCamera()">① カメラ起動</button>
-    
-    <!-- 撮影時 -->
     <button id="recBtn" class="btn-rec" onclick="toggleRecording()" disabled style="display: inline-block;">② 録画開始</button>
-    
-    <!-- プレビュー確認時（初期非表示） -->
     <button id="retakeBtn" class="btn-retake" onclick="retakeVideo()" style="display: none;">撮り直す</button>
     <button id="sendBtn" class="btn-send" onclick="uploadVideo()" style="display: none;">新郎新婦へ送信</button>
   </div>
 
   <script>
-    // ==========================================
-    // ⚙️ 設定エリア
-    // ==========================================
     const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycby7staI1mQ9FWeF9H0uW2l9AT8lK-Kgqs3pmmvUP8VMuHFT4_G-lpocISVJhiltfkuQ/exec';
-
-    const MAX_RECORD_SECONDS = 30; // 上限撮影時間（秒）
+    const MAX_RECORD_SECONDS = 30;
 
     const canvas = document.getElementById('previewCanvas');
     const ctx = canvas.getContext('2d');
@@ -193,7 +172,6 @@
     frameImage.src = 'frame.png';
     frameImage.onload = () => { frameLoaded = true; };
 
-    // リアルタイム描画ループ（アスペクト比を維持して切り出し）
     function drawComposite() {
       if (video.readyState >= 2 && !video.paused && !video.ended) {
         const targetRatio = 9 / 16;
@@ -221,7 +199,6 @@
       requestAnimationFrame(drawComposite);
     }
 
-    // ① カメラの起動（カメラ本来の自然な画角で取得）
     async function startCamera() {
       try {
         userStream = await navigator.mediaDevices.getUserMedia({
@@ -233,9 +210,9 @@
         
         video.onloadedmetadata = () => {
           video.play();
-          // 高解像度（1080 × 1920）でキャンバスをセット
-          canvas.width = 1080;
-          canvas.height = 1920;
+          // 容量削減のためキャンバスサイズを 720 × 1280 に設定
+          canvas.width = 720;
+          canvas.height = 1280;
           drawComposite();
         };
 
@@ -246,7 +223,6 @@
       }
     }
 
-    // iOS/Androidで再生可能な録画フォーマットを自動選択
     function getSupportedMimeType() {
       const types = [
         'video/mp4;codecs=avc1',
@@ -260,7 +236,6 @@
       return '';
     }
 
-    // ② 録画の開始・停止
     function toggleRecording() {
       if (!isRecording) {
         startRecording();
@@ -282,9 +257,9 @@
 
       const mimeType = getSupportedMimeType();
       
-      // 1080x1920の高解像度を保持しつつ容量オーバーを防ぐビットレート最適化
+      // ビットレートを 1.0Mbps に下げて容量を最適化
       const recorderOptions = {
-        videoBitsPerSecond: 2500000 // 2.5Mbps
+        videoBitsPerSecond: 1000000 
       };
       if (mimeType) recorderOptions.mimeType = mimeType;
 
@@ -325,7 +300,6 @@
       recStatus.classList.remove('active');
     }
 
-    // ③ 録画完了後の処理
     function processRecordedVideo() {
       const mimeType = mediaRecorder.mimeType || 'video/mp4';
       recordedBlob = new Blob(recordedChunks, { type: mimeType });
@@ -341,7 +315,6 @@
       sendBtn.style.display = 'inline-block';
     }
 
-    // ④ 撮り直し処理
     function retakeVideo() {
       if (recordedVideo.src) {
         URL.revokeObjectURL(recordedVideo.src);
@@ -360,7 +333,6 @@
       recBtn.disabled = false;
     }
 
-    // BlobをBase64文字列に変換
     function blobToBase64(blob) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -373,8 +345,6 @@
       });
     }
 
-    // ⑤ 新郎新婦への動画自動アップロード（送信）
-    // ⑤ 新郎新婦への動画自動アップロード（送信・CORS対策版）
     async function uploadVideo() {
       if (!recordedBlob || recordedBlob.size === 0) {
         alert('動画データが正常に作成されていません。撮り直してください。');
@@ -388,33 +358,35 @@
       const ext = (mediaRecorder.mimeType || '').includes('mp4') ? 'mp4' : 'webm';
       const fileName = `wedding_msg_${Date.now()}.${ext}`;
 
-      try {
-        const base64Data = await blobToBase64(recordedBlob);
+      if (UPLOAD_ENDPOINT) {
+        try {
+          const base64Data = await blobToBase64(recordedBlob);
 
-        const payload = {
-          base64: base64Data,
-          mimeType: recordedBlob.type || 'video/mp4',
-          fileName: fileName
-        };
+          const payload = {
+            base64: base64Data,
+            mimeType: recordedBlob.type || 'video/mp4',
+            fileName: fileName
+          };
 
-        // mode: 'no-cors' を指定してブラウザの通信ブロックを回避
-        await fetch(UPLOAD_ENDPOINT, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify(payload)
-        });
+          const response = await fetch(UPLOAD_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(payload)
+          });
 
-        // 送信完了画面を表示
-        showThanksScreen();
+          const result = await response.json();
 
-      } catch (err) {
-        alert('送信時にエラーが発生しました。\n' + err.message);
-        sendBtn.disabled = false;
-        retakeBtn.disabled = false;
-        sendBtn.innerText = '新郎新婦へ送信';
-      }
-    }
+          if (result.status === 'success') {
+            showThanksScreen();
+          } else {
+            throw new Error(result.message);
+          }
+        } catch (err) {
+          alert('【エラー詳細】\n' + err.message);
+          sendBtn.disabled = false;
+          retakeBtn.disabled = false;
+          sendBtn.innerText = '新郎新婦へ送信';
+        }
       } else {
         setTimeout(() => {
           showThanksScreen();
