@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>結婚式メッセージカメラ (合成版)</title>
+  <title>結婚式メッセージカメラ</title>
   <style>
     body { font-family: sans-serif; text-align: center; margin: 0; padding: 20px; background: #f4f4f7; }
     
-    /* 合成プレビュー用のCanvas（9:16比率） */
+    /* 縦型スマホ画面の枠組（9:16比率） */
     .camera-container {
       position: relative;
       width: 100%;
@@ -20,15 +20,15 @@
       box-shadow: 0 8px 20px rgba(0,0,0,0.2);
     }
 
-    /* プレビュー用のCanvas要素 */
-    #previewCanvas {
-      width: 100%; height: 100%;
-      object-fit: cover;
-    }
+    video { width: 100%; height: 100%; object-fit: cover; }
 
-    /* バックグラウンドでカメラ映像を受けるVideo要素（非表示） */
-    #backgroundVideo {
-      display: none;
+    /* カメラの上にぴったり重ねる透過画像フレーム */
+    .frame-overlay {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      object-fit: contain; /* 画像の比率を維持して重ねる */
+      pointer-events: none; /* ボタン操作を邪魔しないようにする */
     }
 
     .controls { margin-top: 20px; }
@@ -43,115 +43,45 @@
 </head>
 <body>
 
-  <h2>メッセージ動画を撮る (合成保存対応)</h2>
+  <h2>メッセージ動画を撮る</h2>
 
   <div class="camera-container">
-    <!-- 合成された映像が表示される画板 -->
-    <canvas id="previewCanvas"></canvas>
+    <video id="video" autoplay playsinline muted></video>
     
-    <!-- カメラ映像を裏で受けるビデオ要素（見えません） -->
-    <video id="backgroundVideo" autoplay playsinline muted></video>
+    <!-- 透過PNG画像のフレーム -->
+    <img src="frame.png" class="frame-overlay" alt="フレーム">
   </div>
 
   <div class="controls">
-    <button class="btn-start" onclick="startApp()">① アプリ起動</button>
+    <button class="btn-start" onclick="startCamera()">① カメラ起動</button>
     <button id="recBtn" class="btn-rec" onclick="toggleRecording()" disabled>② 録画開始</button>
   </div>
 
   <script>
-    const canvas = document.getElementById('previewCanvas');
-    const ctx = canvas.getContext('2d');
-    const video = document.getElementById('backgroundVideo');
-    const recBtn = document.getElementById('recBtn');
-    
     let mediaRecorder;
     let recordedChunks = [];
     let isRecording = false;
-    let frameImage; // フレーム画像を保持する変数
 
-    // フレーム画像の読み込み
-    function loadFrame() {
-      return new Promise((resolve, reject) => {
-        frameImage = new Image();
-        frameImage.src = 'frame.png'; // ファイル名が異なる場合は修正してください
-        frameImage.onload = () => resolve();
-        frameImage.onerror = (e) => reject(e);
-      });
-    }
-
-    // カメラ映像とフレーム画像を合成してCanvasに描画する
-    function drawComposite() {
-      // 1. カメラ映像を描画
-      // Canvasのアスペクト比を9:16に固定
-      const targetAspectRatio = 9 / 16;
-      const videoAspectRatio = video.videoWidth / video.videoHeight;
-      
-      let drawWidth, drawHeight, offsetX, offsetY;
-      if (videoAspectRatio > targetAspectRatio) {
-        // カメラが横に長い場合、中央を切り抜く
-        drawHeight = video.videoHeight;
-        drawWidth = drawHeight * targetAspectRatio;
-        offsetX = (video.videoWidth - drawWidth) / 2;
-        offsetY = 0;
-      } else {
-        // カメラが縦に長い場合、中央を切り抜く
-        drawWidth = video.videoWidth;
-        drawHeight = drawWidth / targetAspectRatio;
-        offsetX = 0;
-        offsetY = (video.videoHeight - drawHeight) / 2;
-      }
-
-      ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight, 0, 0, canvas.width, canvas.width / targetAspectRatio);
-
-      // 2. フレーム画像を重ねて描画
-      if (frameImage) {
-        ctx.drawImage(frameImage, 0, 0, canvas.width, canvas.width / targetAspectRatio);
-      }
-
-      // 次のフレームも描画を続ける
-      requestAnimationFrame(drawComposite);
-    }
-
-    async function startApp() {
+    async function startCamera() {
       try {
-        // ① フレーム画像を先に読み込む
-        await loadFrame();
-
-        // ② カメラ・マイクのストリームを取得
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: "user", width: 1080, height: 1920 }, // スマホの縦解像度を想定
+          video: { facingMode: "user" },
           audio: true
         });
+        document.getElementById('video').srcObject = stream;
         
-        video.srcObject = stream;
-        
-        // ビデオの読み込み完了を待ってからCanvasのサイズをセット
-        video.onloadedmetadata = () => {
-          // Canvasの解像度をスマホに合わせる
-          canvas.width = 1080;
-          canvas.height = 1920; 
-          // 合成描画ループを開始
-          drawComposite();
-        };
-
-        // ③ 録画機能のセットアップ（Canvasからストリームを取得）
-        // 録画対象を canvas.captureStream() に変更
-        mediaRecorder = new MediaRecorder(canvas.captureStream(30), {
-          mimeType: 'video/webm; codecs=vp9' // iOSでは後でmp4に変換して保存します
-        });
-        
+        mediaRecorder = new MediaRecorder(stream);
         mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
         mediaRecorder.onstop = saveVideo;
 
-        recBtn.disabled = false;
-        alert('準備ができました！');
+        document.getElementById('recBtn').disabled = false;
       } catch (err) {
-        alert('起動に失敗しました。カメラ・マイクの許可、またはフレーム画像を確認してください: ' + err);
-        console.error(err);
+        alert('カメラ・マイクの許可が必要です: ' + err);
       }
     }
 
     function toggleRecording() {
+      const recBtn = document.getElementById('recBtn');
       if (!isRecording) {
         recordedChunks = [];
         mediaRecorder.start();
@@ -167,20 +97,13 @@
     }
 
     function saveVideo() {
-      // 録画されたデータを Blob に変換
-      const blob = new Blob(recordedChunks, { type: 'video/webm' });
+      const blob = new Blob(recordedChunks, { type: 'video/mp4' });
       const url = URL.createObjectURL(blob);
-      
-      // ダウンロード用のリンクを作成
       const a = document.createElement('a');
       a.href = url;
-      // iOSSafariでは、webmのままではアルバムに保存できないことがあるので、
-      // サーバー側でmp4に変換する仕組みが必要です。今回はwebmのままダウンロードします。
-      a.download = 'wedding_message_composite.webm';
+      a.download = 'wedding_message.mp4';
       a.click();
-      
-      URL.revokeObjectURL(url); // メモリ解放
-      alert('動画がダウンロードされました。デザインが合成されているか確認してください！');
+      alert('動画の保存が完了しました！');
     }
   </script>
 </body>
