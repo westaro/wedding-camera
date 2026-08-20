@@ -403,7 +403,8 @@
           throw new Error(result.message);
         }
       } catch (err) {
-        alert('送信に失敗しました。通信環境をご確認のうえ再度お試しください。');
+        // エラーの「具体的な理由」を画面にポップアップ表示する
+        alert('【エラー詳細】\n' + err.message);
         sendBtn.disabled = false;
         retakeBtn.disabled = false;
         sendBtn.innerText = '新郎新婦へ送信';
