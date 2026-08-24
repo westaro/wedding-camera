@@ -302,6 +302,19 @@
       recBtn.disabled = false;
     }
 
+    // Blobを完全に安全なBase64文字列に変換する関数
+    function blobToBase64(blob) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64String = reader.result.split(',')[1];
+          resolve(base64String);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    }
+
     async function uploadVideo() {
       if (!recordedBlob || recordedBlob.size === 0) {
         alert('動画データが正常に作成されていません。撮り直してください。');
@@ -312,18 +325,22 @@
       retakeBtn.disabled = true;
       sendBtn.innerText = '送信中...';
 
-      const mimeType = recordedBlob.type || 'video/mp4';
-      const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
-      const fileName = `wedding_msg_${Date.now()}.${ext}`;
-
       try {
-        // クエリパラメータにファイル名とMIMEタイプを乗せ、ボディには「生のバイナリデータ(Blob)」をそのまま送る
-        const requestUrl = `${UPLOAD_ENDPOINT}?mimeType=${encodeURIComponent(mimeType)}&fileName=${encodeURIComponent(fileName)}`;
+        const base64Data = await blobToBase64(recordedBlob);
+        const mimeType = recordedBlob.type || 'video/mp4';
+        const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
+        const fileName = `wedding_msg_${Date.now()}.${ext}`;
 
-        const response = await fetch(requestUrl, {
+        const payload = {
+          fileData: base64Data,
+          mimeType: mimeType,
+          fileName: fileName
+        };
+
+        const response = await fetch(UPLOAD_ENDPOINT, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/octet-stream' },
-          body: recordedBlob // Base64変換せず、Blobをそのまま送信！
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
         });
 
         const resultText = await response.text();
