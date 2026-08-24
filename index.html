@@ -129,7 +129,7 @@
   </div>
 
   <script>
-    // ▼ 新しいGASのウェブアプリURLを設定済み ▼
+    // ▼ 新しく作成したGASのウェブアプリURL ▼
     const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx3oaSXqn4TLnjttXT2_HJeBJLee82I7OeB-WA94GWX-jumepJucttnUrV0gQoMboKd/exec';
     const MAX_RECORD_SECONDS = 30;
 
@@ -334,15 +334,24 @@
         const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
         const fileName = `wedding_msg_${Date.now()}.${ext}`;
 
+        const payload = {
+          fileData: base64Data,
+          mimeType: mimeType,
+          fileName: fileName
+        };
+
+        // 最も安定するJSON形式での送信
         const response = await fetch(UPLOAD_ENDPOINT, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: `mimeType=${encodeURIComponent(mimeType)}&fileName=${encodeURIComponent(fileName)}&fileData=${encodeURIComponent(base64Data)}`
+          headers: {
+            'Content-Type': 'text/plain;charset=utf-8'
+          },
+          body: JSON.stringify(payload)
         });
 
         const resultText = await response.text();
 
-        if (resultText.startsWith('success')) {
+        if (resultText.trim().startsWith('success')) {
           showThanksScreen();
         } else {
           throw new Error(resultText);
