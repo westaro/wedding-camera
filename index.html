@@ -318,7 +318,6 @@
       });
     }
 
-    // ★ iOSのCORS/リダイレクト制限を回避する「隠しフォーム送信方式」
     async function uploadVideo() {
       if (!recordedBlob || recordedBlob.size === 0) {
         alert('動画データが正常に作成されていません。撮り直してください。');
@@ -327,7 +326,7 @@
 
       sendBtn.disabled = true;
       retakeBtn.disabled = true;
-      sendBtn.innerText = '送信中...';
+      sendBtn.innerText = '送信処理中...';
 
       try {
         const base64Data = await blobToBase64(recordedBlob);
@@ -335,7 +334,6 @@
         const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
         const fileName = `wedding_msg_${Date.now()}.${ext}`;
 
-        // 隠しiframeを作成（ページ遷移せずに裏で送信結果を受け取るため）
         let iframe = document.getElementById('hidden_iframe');
         if (!iframe) {
           iframe = document.createElement('iframe');
@@ -345,7 +343,6 @@
           document.body.appendChild(iframe);
         }
 
-        // 隠しフォームを動的に生成
         let form = document.getElementById('upload_form');
         if (!form) {
           form = document.createElement('form');
@@ -357,7 +354,6 @@
         }
         form.innerHTML = '';
 
-        // 送信データをセット
         const addInput = (name, value) => {
           const input = document.createElement('input');
           input.type = 'hidden';
@@ -370,12 +366,13 @@
         addInput('mimeType', mimeType);
         addInput('fileName', fileName);
 
-        // 送信完了を検知するタイマー（フォーム送信はレスポンスが直接取れないため約3秒後に完了画面へ）
+        console.log('フォーム送信を実行します。サイズ:', base64Data.length);
         form.submit();
 
+        // 送信後、確実に画面を切り替える
         setTimeout(() => {
           showThanksScreen();
-        }, 3000);
+        }, 2000);
 
       } catch (err) {
         alert('送信エラー: ' + err.message);
