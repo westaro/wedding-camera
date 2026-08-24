@@ -129,7 +129,7 @@
   </div>
 
   <script>
-    // ▼ https://script.google.com/macros/s/AKfycbydBcy0z6S68UYOLmO6rwi8VUV02s8rSD9mJ3o4BapHcVEENxLKMv09kFBmBedQ9eBZ/exec ▼
+    // ▼ GASのウェブアプリURL ▼
     const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycbydBcy0z6S68UYOLmO6rwi8VUV02s8rSD9mJ3o4BapHcVEENxLKMv09kFBmBedQ9eBZ/exec';
     const MAX_RECORD_SECONDS = 30;
 
@@ -304,15 +304,14 @@
 
     function blobToBase64(blob) {
       return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          let res = reader.result || '';
-          // 修正：GASの負担を減らすため、ブラウザ側で余分な文字列をカットする
+        const renderer = new FileReader();
+        renderer.onloadend = () => {
+          let res = renderer.result || '';
           if (res.includes(',')) res = res.split(',')[1];
           resolve(res);
         };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
+        renderer.onerror = reject;
+        renderer.readAsDataURL(blob);
       });
     }
 
@@ -334,14 +333,21 @@
         const base64Data = await blobToBase64(recordedBlob);
         const requestUrl = `${UPLOAD_ENDPOINT}?mimeType=${encodeURIComponent(mimeType)}&fileName=${encodeURIComponent(fileName)}`;
 
-        await fetch(requestUrl, {
+        // ▼【修正箇所】mode: 'no-cors' を外し、レスポンスを受け取れるように変更 ▼
+        const response = await fetch(requestUrl, {
           method: 'POST',
-          mode: 'no-cors',
           headers: { 'Content-Type': 'text/plain' },
           body: base64Data
         });
 
-        showThanksScreen();
+        const resultText = await response.text();
+
+        // GAS側からの返却値が "success" で始まっているかチェック
+        if (resultText.startsWith('success')) {
+          showThanksScreen();
+        } else {
+          throw new Error(resultText);
+        }
 
       } catch (err) {
         alert('送信エラー: ' + err.message);
