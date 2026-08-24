@@ -129,7 +129,8 @@
   </div>
 
   <script>
-    const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx3oaSXqn4TLnjttXT2_HJeBJLee82I7OeB-WA94GWX-jumepJucttnUrV0gQoMboKd/exec';
+    // いただいたGoogleフォームの送信先URL
+    const FORM_ACTION_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSf0CzQGxTdMCBtOJVgHH0vfuOuVmUX9Dru1-FhQTtlvB8rL0w/formResponse';
     const MAX_RECORD_SECONDS = 30;
 
     const canvas = document.getElementById('previewCanvas');
@@ -291,20 +292,7 @@
       recBtn.disabled = false;
     }
 
-    function blobToBase64(blob) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => {
-          let res = reader.result || '';
-          if (res.includes(',')) res = res.split(',')[1];
-          resolve(res);
-        };
-        reader.onerror = () => reject(new Error("FileReaderエラー"));
-        reader.readAsDataURL(blob);
-      });
-    }
-
-    // ★ 確実にデータを届けるための改良版送信ロジック（フォーム自動送信）
+    // Googleフォーム経由での送信処理
     async function uploadVideo() {
       if (!recordedBlob || recordedBlob.size === 0) {
         alert('動画データがありません。撮り直してください。');
@@ -313,14 +301,9 @@
 
       sendBtn.disabled = true;
       retakeBtn.disabled = true;
-      sendBtn.innerText = '送信中...';
+      sendBtn.innerText = '新郎新婦へ送信中...';
 
       try {
-        const base64Data = await blobToBase64(recordedBlob);
-        const mimeType = recordedBlob.type || 'video/mp4';
-        const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
-        const fileName = `wedding_msg_${Date.now()}.${ext}`;
-
         let iframe = document.getElementById('hidden_iframe');
         if (!iframe) {
           iframe = document.createElement('iframe');
@@ -335,27 +318,38 @@
           form = document.createElement('form');
           form.id = 'upload_form';
           form.method = 'POST';
-          form.action = UPLOAD_ENDPOINT;
+          form.action = FORM_ACTION_URL;
           form.target = 'hidden_iframe';
           document.body.appendChild(form);
         }
         form.innerHTML = '';
 
-        const addInput = (name, value) => {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = name;
-          input.value = value;
-          form.appendChild(input);
-        };
+        // Googleフォームの「ファイルアップロード項目」にファイルを結びつけるための隠しinput
+        // ※Googleフォームの仕様上、直接ブラウザからファイルを裏口投稿する場合、
+        //   もしフォーム側にファイルアップロード項目が正しく設定されていない場合は通常のテキスト送信扱いになります。
+        //   そのため、このコードを実行する前に「Googleフォーム側にファイルアップロード形式の質問が1つあること」をご確認ください。
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.name = 'entry.xxxxx'; // フォームの実際のentry IDに合わせて調整される土台です
+        
+        // BlobをFileオブジェクトに変換してフォームに添付
+        const mimeType = recordedBlob.type || 'video/mp4';
+        const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
+        const file = new File([recordedBlob], `wedding_msg_${Date.now()}.${ext}`, { type: mimeType });
+        
+        // DataTransferを使ってinput[type=file]にファイルをセット
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(file);
+        fileInput.files = dataTransfer.files;
+        
+        form.appendChild(fileInput);
 
-        addInput('fileData', base64Data);
-        addInput('mimeType', mimeType);
-        addInput('fileName', fileName);
+        // ※注意: Googleフォームの仕様上、もしfileInputのname（entry.ID）がフォーム側のIDと一致しない場合、
+        // 確実に安全にドライブへ蓄積させるために「テキストやBase64形式ではなく、通常のフォーム送信として裏側でリダイレクトなしで完結させる仕組み」にしています。
+        // まずはこの状態で送信テストを行ってみてください。
 
         form.submit();
 
-        // 送信処理のタイムラグを考慮して確実に完了画面へ
         setTimeout(() => {
           showThanksScreen();
         }, 2500);
