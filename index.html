@@ -337,17 +337,15 @@
         const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
         const fileName = `wedding_msg_${Date.now()}.${ext}`;
 
-        const payload = {
-          fileData: base64Data,
-          mimeType: mimeType,
-          fileName: fileName
-        };
+        // フォームデータ形式（multipart/form-data）で送信し、容量制限やパースエラーを回避
+        const formData = new FormData();
+        formData.append("fileData", base64Data);
+        formData.append("mimeType", mimeType);
+        formData.append("fileName", fileName);
 
-        // text/plainとして綺麗なJSONをそのまま送る
         const response = await fetch(UPLOAD_ENDPOINT, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
+          body: formData
         });
 
         const resultText = await response.text();
