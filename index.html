@@ -129,7 +129,7 @@
   </div>
 
   <script>
-    // ▼ GASのウェブアプリURL ▼
+    // ▼ ここにGASのウェブアプリURLを貼り付けてください ▼
     const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx3oaSXqn4TLnjttXT2_HJeBJLee82I7OeB-WA94GWX-jumepJucttnUrV0gQoMboKd/exec';
     const MAX_RECORD_SECONDS = 30;
 
@@ -309,12 +309,9 @@
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => {
-          const base64String = reader.result.split(',')[1];
-          if (!base64String) {
-            reject(new Error("FileReaderでBase64の抽出に失敗しました"));
-            return;
-          }
-          resolve(base64String);
+          let res = reader.result || '';
+          if (res.includes(',')) res = res.split(',')[1];
+          resolve(res);
         };
         reader.onerror = () => reject(new Error("FileReaderの読み込みエラー"));
         reader.readAsDataURL(blob);
@@ -337,19 +334,11 @@
         const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
         const fileName = `wedding_msg_${Date.now()}.${ext}`;
 
-        const payload = {
-          fileData: base64Data,
-          mimeType: mimeType,
-          fileName: fileName
-        };
-
-        // プレーンテキストとして確実に本体を送信
+        // URLのクエリパラメータとしてデータを直接POSTする最も確実な方法
         const response = await fetch(UPLOAD_ENDPOINT, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'text/plain;charset=utf-8'
-          },
-          body: JSON.stringify(payload)
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: `mimeType=${encodeURIComponent(mimeType)}&fileName=${encodeURIComponent(fileName)}&fileData=${encodeURIComponent(base64Data)}`
         });
 
         const resultText = await response.text();
