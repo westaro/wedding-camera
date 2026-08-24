@@ -242,7 +242,6 @@
       ]);
 
       const mimeType = getSupportedMimeType();
-      // ★ Load failed対策：ビットレートを下げてファイルサイズを軽量化
       const recorderOptions = { videoBitsPerSecond: 200000 };
       if (mimeType) recorderOptions.mimeType = mimeType;
 
@@ -319,6 +318,7 @@
       });
     }
 
+    // ★ iOSのCORS/リダイレクト制限を回避する「隠しフォーム送信方式」
     async function uploadVideo() {
       if (!recordedBlob || recordedBlob.size === 0) {
         alert('動画データが正常に作成されていません。撮り直してください。');
@@ -335,27 +335,47 @@
         const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
         const fileName = `wedding_msg_${Date.now()}.${ext}`;
 
-        const payload = {
-          fileData: base64Data,
-          mimeType: mimeType,
-          fileName: fileName
+        // 隠しiframeを作成（ページ遷移せずに裏で送信結果を受け取るため）
+        let iframe = document.getElementById('hidden_iframe');
+        if (!iframe) {
+          iframe = document.createElement('iframe');
+          iframe.name = 'hidden_iframe';
+          iframe.id = 'hidden_iframe';
+          iframe.style.display = 'none';
+          document.body.appendChild(iframe);
+        }
+
+        // 隠しフォームを動的に生成
+        let form = document.getElementById('upload_form');
+        if (!form) {
+          form = document.createElement('form');
+          form.id = 'upload_form';
+          form.method = 'POST';
+          form.action = UPLOAD_ENDPOINT;
+          form.target = 'hidden_iframe';
+          document.body.appendChild(form);
+        }
+        form.innerHTML = '';
+
+        // 送信データをセット
+        const addInput = (name, value) => {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = name;
+          input.value = value;
+          form.appendChild(input);
         };
 
-        const response = await fetch(UPLOAD_ENDPOINT, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(payload)
-        });
+        addInput('fileData', base64Data);
+        addInput('mimeType', mimeType);
+        addInput('fileName', fileName);
 
-        const resultText = await response.text();
+        // 送信完了を検知するタイマー（フォーム送信はレスポンスが直接取れないため約3秒後に完了画面へ）
+        form.submit();
 
-        if (resultText.trim().startsWith('success')) {
+        setTimeout(() => {
           showThanksScreen();
-        } else {
-          throw new Error(resultText);
-        }
+        }, 3000);
 
       } catch (err) {
         alert('送信エラー: ' + err.message);
