@@ -242,7 +242,8 @@
       ]);
 
       const mimeType = getSupportedMimeType();
-      const recorderOptions = { videoBitsPerSecond: 600000 };
+      // ★ Load failed対策：ビットレートを下げてファイルサイズを軽量化
+      const recorderOptions = { videoBitsPerSecond: 200000 };
       if (mimeType) recorderOptions.mimeType = mimeType;
 
       mediaRecorder = new MediaRecorder(combinedStream, recorderOptions);
