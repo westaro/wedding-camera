@@ -129,7 +129,6 @@
   </div>
 
   <script>
-    // ▼ GASのウェブアプリURL ▼
     const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx3oaSXqn4TLnjttXT2_HJeBJLee82I7OeB-WA94GWX-jumepJucttnUrV0gQoMboKd/exec';
     const MAX_RECORD_SECONDS = 30;
 
@@ -194,30 +193,22 @@
           video: { facingMode: "user" },
           audio: true
         });
-        
         video.srcObject = userStream;
-        
         video.onloadedmetadata = () => {
           video.play();
           canvas.width = 720;
           canvas.height = 1280;
           drawComposite();
         };
-
         recBtn.disabled = false;
         startBtn.style.display = 'none';
       } catch (err) {
-        alert('カメラ・マイクの起動に失敗しました。アクセス許可をご確認ください。');
+        alert('カメラ・マイクの起動に失敗しました。');
       }
     }
 
     function getSupportedMimeType() {
-      const types = [
-        'video/mp4;codecs=avc1',
-        'video/mp4',
-        'video/webm;codecs=vp9',
-        'video/webm'
-      ];
+      const types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
       for (const type of types) {
         if (MediaRecorder.isTypeSupported(type)) return type;
       }
@@ -225,11 +216,8 @@
     }
 
     function toggleRecording() {
-      if (!isRecording) {
-        startRecording();
-      } else {
-        stopRecording();
-      }
+      if (!isRecording) startRecording();
+      else stopRecording();
     }
 
     function startRecording() {
@@ -276,10 +264,8 @@
 
     async function processRecordedVideo() {
       await new Promise(resolve => setTimeout(resolve, 400));
-
       const mimeType = mediaRecorder.mimeType || 'video/mp4';
       recordedBlob = new Blob(recordedChunks, { type: mimeType });
-
       const videoURL = URL.createObjectURL(recordedBlob);
       recordedVideo.src = videoURL;
 
@@ -313,20 +299,21 @@
           if (res.includes(',')) res = res.split(',')[1];
           resolve(res);
         };
-        reader.onerror = () => reject(new Error("FileReaderの読み込みエラー"));
+        reader.onerror = () => reject(new Error("FileReaderエラー"));
         reader.readAsDataURL(blob);
       });
     }
 
+    // ★ 確実にデータを届けるための改良版送信ロジック（フォーム自動送信）
     async function uploadVideo() {
       if (!recordedBlob || recordedBlob.size === 0) {
-        alert('動画データが正常に作成されていません。撮り直してください。');
+        alert('動画データがありません。撮り直してください。');
         return;
       }
 
       sendBtn.disabled = true;
       retakeBtn.disabled = true;
-      sendBtn.innerText = '送信処理中...';
+      sendBtn.innerText = '送信中...';
 
       try {
         const base64Data = await blobToBase64(recordedBlob);
@@ -366,13 +353,12 @@
         addInput('mimeType', mimeType);
         addInput('fileName', fileName);
 
-        console.log('フォーム送信を実行します。サイズ:', base64Data.length);
         form.submit();
 
-        // 送信後、確実に画面を切り替える
+        // 送信処理のタイムラグを考慮して確実に完了画面へ
         setTimeout(() => {
           showThanksScreen();
-        }, 2000);
+        }, 2500);
 
       } catch (err) {
         alert('送信エラー: ' + err.message);
