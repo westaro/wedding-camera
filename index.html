@@ -129,7 +129,7 @@
   </div>
 
   <script>
-    // ▼ ここにGASのウェブアプリURLを貼り付けてください ▼
+    // ▼ 新しいGASのウェブアプリURLを設定済み ▼
     const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx3oaSXqn4TLnjttXT2_HJeBJLee82I7OeB-WA94GWX-jumepJucttnUrV0gQoMboKd/exec';
     const MAX_RECORD_SECONDS = 30;
 
@@ -334,7 +334,6 @@
         const ext = mimeType.includes('webm') ? 'webm' : 'mp4';
         const fileName = `wedding_msg_${Date.now()}.${ext}`;
 
-        // URLのクエリパラメータとしてデータを直接POSTする最も確実な方法
         const response = await fetch(UPLOAD_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
