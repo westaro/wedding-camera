@@ -274,18 +274,11 @@
       recStatus.classList.remove('active');
     }
 
-    // iPhoneなどの遅延対策を加えた安全な動画生成処理
     async function processRecordedVideo() {
       await new Promise(resolve => setTimeout(resolve, 400));
 
       const mimeType = mediaRecorder.mimeType || 'video/mp4';
       recordedBlob = new Blob(recordedChunks, { type: mimeType });
-
-      if (recordedBlob.size === 0) {
-        alert('動画データの生成に失敗しました。もう一度録画し直してください。');
-        retakeVideo();
-        return;
-      }
 
       const videoURL = URL.createObjectURL(recordedBlob);
       recordedVideo.src = videoURL;
@@ -329,8 +322,15 @@
     }
 
     async function uploadVideo() {
-      if (!recordedBlob || recordedBlob.size === 0) {
-        alert('動画データが正常に作成されていません。撮り直してください。');
+      // 🚨【デバッグ用チェック】送信を押した瞬間にファイルサイズを表示します
+      if (!recordedBlob) {
+        alert('エラー: 動画データ(recordedBlob)が存在しません。');
+        return;
+      }
+      alert('【確認】現在の動画サイズ: ' + recordedBlob.size + ' バイト');
+
+      if (recordedBlob.size === 0) {
+        alert('動画データが 0 バイトです。iPhone等でCanvasの録画がブロックされています。');
         return;
       }
 
@@ -350,7 +350,7 @@
           fileName: fileName
         };
 
-        const response = alt = await fetch(UPLOAD_ENDPOINT, {
+        const response = await fetch(UPLOAD_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
