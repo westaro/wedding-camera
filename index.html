@@ -322,15 +322,8 @@
     }
 
     async function uploadVideo() {
-      // 🚨【デバッグ用チェック】送信を押した瞬間にファイルサイズを表示します
-      if (!recordedBlob) {
-        alert('エラー: 動画データ(recordedBlob)が存在しません。');
-        return;
-      }
-      alert('【確認】現在の動画サイズ: ' + recordedBlob.size + ' バイト');
-
-      if (recordedBlob.size === 0) {
-        alert('動画データが 0 バイトです。iPhone等でCanvasの録画がブロックされています。');
+      if (!recordedBlob || recordedBlob.size === 0) {
+        alert('動画データが正常に作成されていません。撮り直してください。');
         return;
       }
 
@@ -350,10 +343,13 @@
           fileName: fileName
         };
 
+        // URLSearchParamsで安全にデータをラップして送信
+        const formData = new URLSearchParams();
+        formData.append("data", JSON.stringify(payload));
+
         const response = await fetch(UPLOAD_ENDPOINT, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-          body: JSON.stringify(payload)
+          body: formData
         });
 
         const resultText = await response.text();
