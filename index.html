@@ -130,7 +130,7 @@
 
   <script>
     // ▼ GASのウェブアプリURL ▼
-    const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxhFuUej8WY2Fkj-iULdesVVuUyRMizW8Zg9BKOgsVwM4oD2xyWO-VKh1nH1rC0KCon/exec';
+    const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycbydBcy0z6S68UYOLmO6rwi8VUV02s8rSD9mJ3o4BapHcVEENxLKMv09kFBmBedQ9eBZ/exec';
     const MAX_RECORD_SECONDS = 30;
 
     const canvas = document.getElementById('previewCanvas');
@@ -304,14 +304,15 @@
 
     function blobToBase64(blob) {
       return new Promise((resolve, reject) => {
-        const renderer = new FileReader();
-        renderer.onloadend = () => {
-          let res = renderer.result || '';
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          let res = reader.result || '';
           if (res.includes(',')) res = res.split(',')[1];
+          res = res.trim().replace(/[\r\n\s]/g, '');
           resolve(res);
         };
-        renderer.onerror = reject;
-        renderer.readAsDataURL(blob);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
       });
     }
 
@@ -331,18 +332,24 @@
 
       try {
         const base64Data = await blobToBase64(recordedBlob);
-        const requestUrl = `${UPLOAD_ENDPOINT}?mimeType=${encodeURIComponent(mimeType)}&fileName=${encodeURIComponent(fileName)}`;
+        if (!base64Data) {
+          throw new Error("Base64データの変換結果が空です。");
+        }
 
-        // ▼【修正箇所】mode: 'no-cors' を外し、レスポンスを受け取れるように変更 ▼
-        const response = await fetch(requestUrl, {
+        const payload = {
+          mimeType: mimeType,
+          fileName: fileName,
+          data: base64Data
+        };
+
+        const response = await fetch(UPLOAD_ENDPOINT, {
           method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: base64Data
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify(payload)
         });
 
         const resultText = await response.text();
 
-        // GAS側からの返却値が "success" で始まっているかチェック
         if (resultText.startsWith('success')) {
           showThanksScreen();
         } else {
