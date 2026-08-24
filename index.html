@@ -129,8 +129,8 @@
   </div>
 
   <script>
-    // ▼ 新しく作成したGASのウェブアプリURL ▼
-    const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycbzvaGVzJKnoh715IkQAm2QrhzwJNr81VaWXwLJAYm0PyJzbSPQvaeoIJQl_qEBxQLoe/exec';
+    // ▼ GASのウェブアプリURL ▼
+    const UPLOAD_ENDPOINT = 'https://script.google.com/macros/s/AKfycbx3oaSXqn4TLnjttXT2_HJeBJLee82I7OeB-WA94GWX-jumepJucttnUrV0gQoMboKd/exec';
     const MAX_RECORD_SECONDS = 30;
 
     const canvas = document.getElementById('previewCanvas');
@@ -340,11 +340,10 @@
           fileName: fileName
         };
 
-        // 最も安定するJSON形式での送信
         const response = await fetch(UPLOAD_ENDPOINT, {
           method: 'POST',
           headers: {
-            'Content-Type': 'text/plain;charset=utf-8'
+            'Content-Type': 'application/json'
           },
           body: JSON.stringify(payload)
         });
