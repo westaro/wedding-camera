@@ -242,8 +242,6 @@
       ]);
 
       const mimeType = getSupportedMimeType();
-      
-      // ★ ここでビットレートを「600kbps」に絞り、ファイルサイズ肥大化と送信エラーを防ぎます
       const recorderOptions = { videoBitsPerSecond: 600000 };
       if (mimeType) recorderOptions.mimeType = mimeType;
 
@@ -276,9 +274,19 @@
       recStatus.classList.remove('active');
     }
 
-    function processRecordedVideo() {
+    // iPhoneなどの遅延対策を加えた安全な動画生成処理
+    async function processRecordedVideo() {
+      await new Promise(resolve => setTimeout(resolve, 400));
+
       const mimeType = mediaRecorder.mimeType || 'video/mp4';
       recordedBlob = new Blob(recordedChunks, { type: mimeType });
+
+      if (recordedBlob.size === 0) {
+        alert('動画データの生成に失敗しました。もう一度録画し直してください。');
+        retakeVideo();
+        return;
+      }
+
       const videoURL = URL.createObjectURL(recordedBlob);
       recordedVideo.src = videoURL;
 
@@ -342,7 +350,7 @@
           fileName: fileName
         };
 
-        const response = await fetch(UPLOAD_ENDPOINT, {
+        const response = alt = await fetch(UPLOAD_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' },
           body: JSON.stringify(payload)
